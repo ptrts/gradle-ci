@@ -1,0 +1,248 @@
+import java.util.regex.Matcher
+import java.util.regex.Pattern
+
+plugins {
+    id "org.springframework.boot" version "2.4.0"
+    id "io.spring.dependency-management" version "1.0.10.RELEASE"
+    id "java"
+    id "io.freefair.lombok" version "5.3.0"
+    id "org.ajoberstar.grgit" version "4.1.0"
+    id 'maven-publish'
+}
+
+// todo Change
+group = "me"
+
+// THESE COMMENTS ARE FOR GRADLE TO BE ABLE TO CHANGE THE VERSION AUTOMATICALLY
+// DO NOT REMOVE THEM!
+/*version>>>*/ version = "DEV-SNAPSHOT" /*<<<version*/
+
+sourceCompatibility = "15"
+
+ext {
+    mapstructVersion = "1.4.1.Final"
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Spring Web
+    implementation "org.springframework.boot:spring-boot-starter-web"
+    testImplementation "org.springframework.boot:spring-boot-starter-test"
+
+    // Spring Security
+    implementation "org.springframework.boot:spring-boot-starter-security"
+    testImplementation "org.springframework.security:spring-security-test"
+
+    // Lombok
+    compileOnly "org.projectlombok:lombok"
+    annotationProcessor "org.projectlombok:lombok"
+
+    // MapStruct
+    implementation "org.mapstruct:mapstruct:${mapstructVersion}"
+    annotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
+    testAnnotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
+
+    // JWT utils
+    implementation "io.jsonwebtoken:jjwt:0.9.1"
+    implementation 'javax.xml.bind:jaxb-api:2.1'
+
+    // Spring WebFlux (only for WebClient)
+    implementation "org.springframework:spring-webflux"
+
+    // Underlying HTTP client used by WebClient
+    implementation "io.projectreactor.netty:reactor-netty"
+
+    // Wiremock
+    testCompile "com.github.tomakehurst:wiremock-jre8:2.27.2"
+
+    // Testcontainers
+    testCompile "org.testcontainers:testcontainers:1.15.0"
+    testCompile "org.testcontainers:junit-jupiter:1.15.0"
+}
+
+test {
+    useJUnitPlatform()
+}
+
+lombok {
+    config["lombok.fieldDefaults.defaultPrivate"] = "true"
+}
+
+compileJava {
+    options.compilerArgs += [
+            "-Amapstruct.verbose=true",
+            "-Amapstruct.defaultComponentModel=spring",
+            "-Amapstruct.unmappedTargetPolicy=ERROR",
+    ]
+}
+
+// This solves 'Artifact wasn't produced by this build' for Spring Boot builds
+// https://stackoverflow.com/a/61250291/2304456
+configurations {
+    [apiElements, runtimeElements].each {
+        it.outgoing.artifacts.removeIf { it.buildDependencies.getDependencies(null).contains(jar) }
+        it.outgoing.artifact(bootJar)
+    }
+}
+
+publishing {
+    publications {
+        smart(MavenPublication) {
+            groupId groupId
+            artifactId artifactId
+            if (project.hasProperty("publicationVersion")) {
+                def publicationVersion = (String) project.property("publicationVersion")
+                println("Publishing with version $publicationVersion")
+                version(publicationVersion)
+            } else {
+                version(version)
+            }
+            from components.java
+        }
+    }
+
+    repositories {
+        maven {
+            name = 'propzMedia'
+            url = "file://e:/_repo"
+            /*
+            credentials {
+                // These must be specified in ~/.gradle/gradle.properties like the following.
+                //      propzMediaMavenRepoUsername=the-username
+                //      propzMediaMavenRepoPassword=the-password
+                // They also may be provided like command line arguments
+                //      -PpropzMediaMavenRepoUsername=the-username -PpropzMediaMavenRepoPassword=the-password
+                // or as environment variables
+                //      ORG_GRADLE_PROJECT_propzMediaMavenRepoUsername=the-username
+                //      ORG_GRADLE_PROJECT_propzMediaMavenRepoPassword=the-password
+                username((String) project.property("propzMediaMavenRepoUsername"))
+                password((String) project.property("propzMediaMavenRepoPassword"))
+            }
+            */
+        }
+    }
+}
+
+tasks.register("changeVersion") {
+    it.group("ci")
+    doLast {
+        String newVersion = project.property("newVersion")
+
+        File backendBuildGradleFile = project.file("build.gradle")
+        String text = backendBuildGradleFile.getText("UTF-8")
+
+        Pattern pattern = Pattern.compile(
+                /^.*\/\*version>>>\*\/(.*)\/\*<<<version\*\/.*$/,
+                Pattern.DOTALL
+        )
+
+        Matcher matcher = pattern.matcher(text)
+        if (matcher.find()) {
+            int groupCount = matcher.groupCount()
+            if (groupCount == 1) {
+                int start = matcher.start(1)
+                int end = matcher.end(1)
+                String group = matcher.group(1)
+                println("start: $start, end: $end, group: $group")
+                println("group:\n$group")
+
+                String before = text.substring(0, start)
+                String after = text.substring(end, text.length())
+                String newText = before + " version = \"$newVersion\" " + after
+
+                backendBuildGradleFile.text = newText
+
+                println("Committing...")
+
+                grgit.commit {
+                    message = "Setting version $newVersion"
+                    paths = [
+                            "backend/build.gradle"
+                    ]
+                    all = false
+                    amend = false
+                    reflogComment = null
+                }
+            }
+        } else {
+            println("Not found version>>> and <<<version comments in build.gradle")
+        }
+    }
+}
+
+tasks.register("tag") {
+    it.group("ci")
+    doLast {
+        String tagName = project.property("tag")
+        grgit.tag.add(
+                name = tagName,
+                pointsTo = "HEAD",
+                force = false,
+                annotate = false
+        )
+    }
+}
+
+tasks.register("push") {
+    it.group("ci")
+    doLast {
+        String branch = project.property("branch")
+        grgit.push {
+            remote = "origin"
+            refsOrSpecs = [
+                    "+$branch:origin/$branch"
+            ]
+            all = false
+            tags = false
+            force = false
+            dryRun = false
+            pushOptions = []
+        }
+    }
+}
+
+tasks.register("pushTag") {
+    it.group("ci")
+    doLast {
+        String tag = project.property("tag")
+        grgit.push {
+            remote = "origin2"
+            refsOrSpecs = [
+                    "+$tag:origin/$tag"
+            ]
+            all = false
+            tags = false
+            force = false
+            dryRun = false
+            pushOptions = []
+        }
+    }
+}
+
+tasks.register("mergeToMaster") {
+    it.group("ci")
+    doLast {
+
+        def branch = grgit.branch.current()
+        if (branch.name != "master") {
+            throw new IllegalStateException("mergeToMaster may be called only on master")
+        }
+
+        println("branch.name = ${branch.name}")
+
+        /*grgit.merge {
+            head = project.property("branch")
+            mode = "create-commit"
+            message = "Merging release $version into master"
+        }*/
+    }
+}
