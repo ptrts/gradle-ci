@@ -184,22 +184,36 @@ tasks.register("tag") {
     doLast {
         String tagName = project.property("tag")
         grgit.tag.add(
-                name = tagName,
-                pointsTo = "HEAD",
-                force = false,
-                annotate = false
+                name: tagName,
+                pointsTo: "HEAD",
+                force: false,
+                annotate: false,
+                message: null,
+                tagger: null
         )
     }
 }
 
+/*
+ * For this to work:
+ *      - the remote must be specified in the "git@..." form (SSH)
+ *      - a valid private SSH key must me added to ssh-agent like this
+ *
+ *              # Start SSH agent
+ *              ssh-agent -s
+ *
+ *              # Add the private key to ssh-agent
+ *              ssh-add ~/.ssh/private_ssh_key_for_git_repo
+ */
 tasks.register("push") {
     it.group("ci")
     doLast {
         String branch = project.property("branch")
+        String remoteName = "origin"
         grgit.push {
-            remote = "origin"
+            remote = remoteName
             refsOrSpecs = [
-                    "+$branch:origin/$branch"
+                    "+$branch:$branch"
             ]
             all = false
             tags = false
@@ -239,10 +253,10 @@ tasks.register("mergeToMaster") {
 
         println("branch.name = ${branch.name}")
 
-        /*grgit.merge {
+        grgit.merge {
             head = project.property("branch")
             mode = "create-commit"
             message = "Merging release $version into master"
-        }*/
+        }
     }
 }
