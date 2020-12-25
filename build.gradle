@@ -246,17 +246,42 @@ tasks.register("mergeToMaster") {
     it.group("ci")
     doLast {
 
-        def branch = grgit.branch.current()
-        if (branch.name != "master") {
+        def version = project.property("version")
+
+        // Merging to master
+        def currentBranch = grgit.branch.current()
+        if (currentBranch.name != "master") {
             throw new IllegalStateException("mergeToMaster may be called only on master")
         }
-
-        println("branch.name = ${branch.name}")
-
+        def branchToMerge = project.property("branch")
         grgit.merge {
-            head = project.property("branch")
+            head = branchToMerge
             mode = "create-commit"
-            message = "Merging release $version into master"
+            message = "Merging branch $branchToMerge into master. Version is $version"
+        }
+
+        // Adding version tag
+        grgit.tag.add(
+                name: version,
+                pointsTo: "HEAD",
+                force: false,
+                annotate: false,
+                message: null,
+                tagger: null
+        )
+
+        // Push
+        String remoteName = "origin"
+        grgit.push {
+            remote = remoteName
+            refsOrSpecs = [
+                    "+master:master"
+            ]
+            all = false
+            tags = true
+            force = false
+            dryRun = false
+            pushOptions = []
         }
     }
 }
