@@ -11,7 +11,7 @@ plugins {
 }
 
 // todo Change
-group = "me"
+group = "com.propzmedia.test"
 
 // THESE COMMENTS ARE FOR GRADLE TO BE ABLE TO CHANGE THE VERSION AUTOMATICALLY
 // DO NOT REMOVE THEM!
@@ -97,37 +97,37 @@ configurations {
 publishing {
     publications {
         smart(MavenPublication) {
-            groupId groupId
-            artifactId artifactId
+            it.groupId groupId
+            it.artifactId artifactId
             if (project.hasProperty("publicationVersion")) {
                 def publicationVersion = (String) project.property("publicationVersion")
                 println("Publishing with version $publicationVersion")
-                version(publicationVersion)
+                it.version(publicationVersion)
             } else {
-                version(version)
+                it.version(version)
             }
-            from components.java
+            it.from components.java
         }
     }
 
     repositories {
         maven {
-            name = 'propzMedia'
-            url = "file://e:/_repo"
-            /*
+            name = 'gpnx'
+            url = "ftp://107.21.126.3/Maven"
             credentials {
-                // These must be specified in ~/.gradle/gradle.properties like the following.
-                //      propzMediaMavenRepoUsername=the-username
-                //      propzMediaMavenRepoPassword=the-password
-                // They also may be provided like command line arguments
-                //      -PpropzMediaMavenRepoUsername=the-username -PpropzMediaMavenRepoPassword=the-password
-                // or as environment variables
-                //      ORG_GRADLE_PROJECT_propzMediaMavenRepoUsername=the-username
-                //      ORG_GRADLE_PROJECT_propzMediaMavenRepoPassword=the-password
-                username((String) project.property("propzMediaMavenRepoUsername"))
-                password((String) project.property("propzMediaMavenRepoPassword"))
+                /*
+                 * These must be specified in ~/.gradle/gradle.properties like the following.
+                 *      gpnxMavenRepoUsername=the-username
+                 *      gpnxMavenRepoPassword=the-password
+                 * They also may be provided like command line arguments
+                 *      -PgpnxMavenRepoUsername=the-username -PgpnxMavenRepoPassword=the-password
+                 * or as environment variables
+                 *      ORG_GRADLE_PROJECT_gpnxMavenRepoUsername=the-username
+                 *      ORG_GRADLE_PROJECT_gpnxMavenRepoPassword=the-password
+                 */
+                username((String) project.property("gpnxMavenRepoUsername"))
+                password((String) project.property("gpnxMavenRepoPassword"))
             }
-            */
         }
     }
 }
