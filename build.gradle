@@ -246,7 +246,7 @@ tasks.register("mergeToMaster") {
     it.group("ci")
     doLast {
 
-        def version = project.property("version")
+        def v = project.property("v")
 
         // Merging to master
         def currentBranch = grgit.branch.current()
@@ -255,14 +255,14 @@ tasks.register("mergeToMaster") {
         }
         def branchToMerge = project.property("branch")
         grgit.merge {
-            head = branchToMerge
+            head = "origin/$branchToMerge"
             mode = "create-commit"
-            message = "Merging branch $branchToMerge into master. Version is $version"
+            message = "Merging branch $branchToMerge (version $v) into master"
         }
 
         // Adding version tag
         grgit.tag.add(
-                name: version,
+                name: v,
                 pointsTo: "HEAD",
                 force: false,
                 annotate: false,
